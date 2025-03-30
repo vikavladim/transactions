@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Список транзакций{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">Движение денежных средств</h2>
+        <a href="{% url 'transactions:create' %}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Добавить
+        </a>
+    </div>
+
+    <div class="card-body">
+        <form method="get" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label for="date_from" class="form-label">Дата от</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from"
+                           value="{{ date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="date_to" class="form-label">Дата до</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to"
+                           value="{{ date_to }}">
+                </div>
+
+                <div class="col-md-2">
+                    <label for="status" class="form-label">Статус</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">Все</option>
+                        {% for status in statuses %}
+                        <option value="{{ status.id }}" {% if selected_status == status.id|stringformat:"s" %}selected{% endif %}>
+                            {{ status.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label for="operation_type" class="form-label">Тип операции</label>
+                    <select class="form-select" id="operation_type" name="operation_type">
+                        <option value="">Все</option>
+                        {% for operation_type in operation_types %}
+                        <option value="{{ operation_type.id }}" {% if selected_operation_type == operation_type.id|stringformat:"s" %}selected{% endif %}>
+                            {{ operation_type.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label for="category" class="form-label">Категория</label>
+                    <select class="form-select" id="category" name="category" {% if not categories %}disabled{% endif %}>
+                        <option value="">Все</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if selected_category == category.id|stringformat:"s" %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label for="subcategory" class="form-label">Подкатегория</label>
+                    <select class="form-select" id="subcategory" name="subcategory" {% if not subcategories %}disabled{% endif %}>
+                        <option value="">Все</option>
+                        {% for subcategory in subcategories %}
+                        <option value="{{ subcategory.id }}" {% if selected_subcategory == subcategory.id|stringformat:"s" %}selected{% endif %}>
+                            {{ subcategory.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-funnel"></i> Применить
+                    </button>
+                    <a href="?date_from={{ default_date_from }}&date_to={{ default_date_to }}"
+                       class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-counterclockwise"></i> Сбросить
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        {% if transactions %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Статус</th>
+                        <th>Тип</th>
+                        <th>Категория</th>
+                        <th>Сумма</th>
+                        <th>Комментарий</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>{{ transaction.date|date:"d.m.Y" }}</td>
+                        <td>{{ transaction.status }}</td>
+                        <td>{{ transaction.operation_type }}</td>
+                        <td>
+                            {{ transaction.category }}
+                            {% if transaction.subcategory %}
+                            <br><small>{{ transaction.subcategory }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="{% if transaction.operation_type.name == 'Пополнение' %}text-success{% else %}text-danger{% endif %}">
+                            {{ transaction.amount|floatformat:2 }} ₽
+                        </td>
+                        <td>{{ transaction.comment|default:"-"|truncatechars:30 }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'transactions:update' transaction.pk %}"
+                                   class="btn btn-outline-primary" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'transactions:delete' transaction.pk %}"
+                                   class="btn btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">Нет транзакций для отображения</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    function loadCategories(operationTypeId) {
+        if (operationTypeId) {
+            $.ajax({
+                url: "{% url 'transactions:ajax_load_categories' %}",
+                data: {
+                    'operation_type': operationTypeId
+                },
+                success: function(data) {
+                    $("#category").html(data).prop('disabled', false);
+                    $("#subcategory").html('<option value="">Все</option>').prop('disabled', true);
+                    if ($("#category option[value='{{ selected_category }}']").length === 0) {
+                        $("#category").val('');
+                    }
+                }
+            });
+        } else {
+            $("#category").html('<option value="">Все</option>{% for cat in categories %}<option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}').prop('disabled', false);
+            $("#subcategory").html('<option value="">Все</option>').prop('disabled', true);
+        }
+    }
+
+    function loadSubcategories(categoryId) {
+        if (categoryId) {
+            $.ajax({
+                url: "{% url 'transactions:ajax_load_subcategories' %}",
+                data: {
+                    'category': categoryId
+                },
+                success: function(data) {
+                    $("#subcategory").html(data).prop('disabled', false);
+                    if ($("#subcategory option[value='{{ selected_subcategory }}']").length === 0) {
+                        $("#subcategory").val('');
+                    }
+                }
+            });
+        } else {
+            $("#subcategory").html('<option value="">Все</option>').prop('disabled', true);
+        }
+    }
+
+    $("#operation_type").change(function() {
+        var operationTypeId = $(this).val();
+        loadCategories(operationTypeId);
+    });
+
+    $("#category").change(function() {
+        var categoryId = $(this).val();
+        loadSubcategories(categoryId);
+    });
+
+    var initialOperationType = $("#operation_type").val();
+    var initialCategory = $("#category").val();
+
+    if (initialOperationType) {
+        loadCategories(initialOperationType);
+    }
+
+    if (initialCategory) {
+        setTimeout(function() {
+            loadSubcategories(initialCategory);
+        }, 100);
+    }
+});
+</script>
+{% endblock %}
